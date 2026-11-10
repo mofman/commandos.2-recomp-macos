@@ -1,0 +1,22 @@
+# Commercial game files and locally generated analysis/code
+analysis/
+gamedata/
+generated/
+generated-retail/
+# Local builds and personal data
+build/
+dist/
+.venv/
+__pycache__/
+*.py[cod]
+.DS_Store
+.claude/
+.codex/
+# Local reference downloads (not needed to build)
+Commandos2-ModernPatch-source/
+Commandos2-ModernPatch-1.3.0-compiled/
+
+# Standalone game executables (including local experiment builds)
+Commandos2
+Commandos2-retail
+Commandos2CleanNOOverrides

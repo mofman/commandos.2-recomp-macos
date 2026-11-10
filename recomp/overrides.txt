@@ -1,0 +1,58 @@
+# Functions replaced by hand-written C in runtime/overrides/. The lifted original stays callable as orig_f_XXXXXXXX.
+# video modes (resolution.c): fixed widescreen list instead of 640x480/800x600/1024x768/1280x1024
+4ecf30   # int __stdcall ModeWidth(int mode)
+4ecf80   # int __stdcall ModeHeight(int mode)
+4ecfd0   # int __thiscall Video::Width()   mode = [this+0x54]
+4ed010   # int __thiscall Video::Height()
+4ed070   # void __thiscall Video::GetSize(SIZE *out)
+4ecf00   # void __thiscall Options::SetVideoMode(int) (clamped to 0..3)
+# COMM2.CFG load (MODOVIDEO): index clamped to 0..3 -> 0..7 (keep in step with the list size in resolution.c)
+patch 4ec4d2 04 08                          # cmp [ebp+0x54], 4 -> 8
+patch 4ec4d8 03000000 07000000              # mov [ebp+0x54], 3 -> 7
+# options menu resolution selector (index this+0xd4): arrows, apply (hardcoded size table), label
+4762b0   # mouse handler (inline left arrow 2->1->0)
+476d20   # previous
+476de0   # next
+476ec0   # apply current
+476110   # label draw (switch only draws 0..2)
+site 47614a hook_video_label              # label draw -> string lookup 0x414ef0 (R640/R800/R024 -> real mode size)
+# video options list 0x474f90
+site 475028 hook_video_list_range         # -> list SetRange 0x8dfb90 (0..3 -> 0..count-1)
+site 475066 hook_video_list_labels        # -> list SetLabels 0x8dff50 (4 fourccs -> one label per mode)
+
+# ---- ported from Commandos2-ModernPatch 1.3.0 (Steam addresses in brackets; see runtime/overrides/ADDRESSES.md)
+# map background tile-array overflow at high resolutions: split large scaled blits (tileblit.c)
+95ef80   # scaled map blitter             [0x856880]
+95f7f0   # scaled map blitter, blending   [0x856ea0]
+# tile cache column cap 24 -> 96 (mov eax,0x18 in tile cache setup 0x952220)   [0x8587ce]
+patch 9522ce b818000000 b860000000
+# inventory grid (handler 0x5d5390): treat double click 0x208 like a click 0x202   [table 0x93092c]
+patch 5d5547 03 01
+# HD pause menu (HDMenus): pause menu activate 0x464270 keeps the game resolution instead of the menu size
+# (menu height/width getters 0x4ed060/0x4ed050 -> game height/width 0x4ed010/0x4ecfd0)   [0x7ab1a9 / 0x7ab1b5]
+patch 46427d e8de8d0800 e88e8d0800
+patch 464289 e8c28d0800 e8428d0800
+# loading screens in 640x480, mission reload (hdmenus.c)
+site 517935 hook_loadscreen_begin           # mission load -> loading screen begin 0x4e1490      [0x44c901]
+site 518fbf hook_loadscreen_begin_generic   # saved game load -> generic loading 0x4e0d40       [0x44d4c5]
+site 464e9d hook_mission_activate_mode      # mission activate -> screen SetMode 0x474f60         [0x7abc2d]
+site 464eb7 hook_mission_reload             # mission activate -> reload 0x518ea0                 [0x7abc46]
+# main loop (mainloop.c)
+site 40323a hook_update                     # WinMain -> CJuego::Update 0x4523d0                  [0x405239]
+site 4032a9 hook_frame                      # WinMain -> CJuego::Frame 0x4526f0                   [0x40529b]
+site 403465 hook_enditer                    # WinMain -> canvas reset 0x420f60 (end of iteration) [0x40535c]
+520930   # world viewer draw (camera interpolation)                                    [vtbl 0xAF37C4[2] = 0x484820]
+site 51c839 hook_cursor_anim                # mission draw -> arrow cursor animation tick 0x516080  [0x44bd10]
+6ced50   # 3D face sequence draw: no keyframe advance in extra frames   [Steam 0x92a5f0]
+# popup dialog setup 0x8e2de0 centres with the 640x480 menu size: centre on the current display (hdmenus.c)
+site 8e2ecf hook_dialog_width               # -> menu width getter 0x4ed050
+site 8e2eef hook_dialog_height              # -> menu height getter 0x4ed060
+# main menu version label: "Ver 1.%d%d" (0xb0cc5c, no room to grow) -> new string in the unused padding after .data
+patch ba9500 000000000000000000000000000000000000 56657220312e256425642d5265636f6d7000
+patch 490b35 5cccb000 0095ba00              # push offset format (version label)
+patch 491782 5cccb000 0095ba00              # push offset format (version label)
+# move the longer version label left so it stays on screen (x 590 -> 542; large-font branch 545 -> 456)
+patch 490b66 4e020000 1e020000
+patch 4917b3 4e020000 1e020000
+patch 490b7c 21020000 c8010000
+patch 4917d8 21020000 c8010000
